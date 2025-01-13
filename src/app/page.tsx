@@ -17,7 +17,7 @@ export default function Home() {
   const { isConnected } = useAccount();
   const { data: signMessageData, signMessage } = useSignMessage();
   const { sendTransaction } = useSendTransaction();
-  const [messageToSign, setMessageToSign] = useState("Hello from Civic Auth!");
+  const [messageToSign, setMessageToSign] = useState("Sign this message");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
 
