@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 import React, { useState, useEffect } from "react";
 import { UserButton, useUser } from "@civic/auth-web3/react";
@@ -8,30 +9,39 @@ import {
   useSignMessage,
   useSendTransaction,
   useDisconnect,
+  usePublicClient,
 } from "wagmi";
 import { userHasWallet } from "@civic/auth-web3";
-import { parseEther } from "viem";
+import { parseEther, formatEther } from "viem";
+import { Chain, mainnet, sepolia, baseSepolia } from "wagmi/chains";
+import { switchNetwork } from "wagmi/actions";
 
 export default function Home() {
   const userContext = useUser();
   const { connect, connectors } = useConnect();
   const { isConnected, address: connectedAddress } = useAccount();
+  const { chain } = useNetwork();
   const { disconnect } = useDisconnect();
   const { data: signMessageData, signMessage } = useSignMessage();
   const { sendTransaction } = useSendTransaction();
   const [messageToSign, setMessageToSign] = useState("Sign this message");
   const [recipientAddress, setRecipientAddress] = useState("");
   const [amount, setAmount] = useState("");
+  const [selectedChain, setSelectedChain] = useState<Chain>(sepolia);
 
-  // Use the connected wallet address for balance instead of Civic wallet
+  // Use the connected wallet address for balance with chain specification
   const balance = useBalance({
     address: isConnected ? connectedAddress : undefined,
+    chainId: selectedChain.id,
   });
 
   const connectExistingWallet = () => {
-    connect({
-      connector: connectors[0],
-    });
+    // Reset any existing connection first
+    if (isConnected) {
+      disconnect();
+    }
+    // Show wallet selector by not specifying a connector
+    connect({ connector: connectors[0] });
   };
 
   const handleDisconnect = async () => {
@@ -67,11 +77,19 @@ export default function Home() {
   const handleSendTransaction = () => {
     if (!recipientAddress || !amount) return;
 
-    sendTransaction({
-      to: recipientAddress as `0x${string}`,
-      value: parseEther(amount),
-    });
+    try {
+      sendTransaction({
+        to: recipientAddress as `0x${string}`,
+        value: parseEther(amount),
+      });
+    } catch (error) {
+      console.error("Transaction error:", error);
+      alert("Error sending transaction. Please check the console for details.");
+    }
   };
+
+  // Format balance to avoid BigInt serialization issues
+  const formattedBalance = balance.data ? formatEther(balance.data.value) : "0";
 
   // Interactive background effect
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -87,6 +105,22 @@ export default function Home() {
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
+
+  // Network switching handler
+  const handleNetworkChange = async (chainId: number) => {
+    try {
+      await switchNetwork({ chainId });
+      const newChain = [sepolia, baseSepolia].find((c) => c.id === chainId);
+      if (newChain) {
+        setSelectedChain(newChain);
+      }
+    } catch (error) {
+      console.error("Error switching network:", error);
+      alert(
+        "Failed to switch network. Please make sure the network is configured in your wallet."
+      );
+    }
+  };
 
   // Display connected wallet info
   const renderWalletInfo = () => {
@@ -111,19 +145,46 @@ export default function Home() {
           <p className="font-mono text-white/80 break-all">
             {connectedAddress}
           </p>
+
+          {/* Network Selector */}
+          <div className="mt-4">
+            <h3 className="text-sm text-blue-400 mb-2">Select Network</h3>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => handleNetworkChange(sepolia.id)}
+                className={`px-4 py-2 rounded-lg transition-colors duration-300 ${
+                  selectedChain.id === sepolia.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                }`}
+              >
+                Sepolia
+              </button>
+              <button
+                onClick={() => handleNetworkChange(baseSepolia.id)}
+                className={`px-4 py-2 rounded-lg transition-colors duration-300 ${
+                  selectedChain.id === baseSepolia.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                }`}
+              >
+                Base Sepolia
+              </button>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-400 mt-4">
+            Current Network: {chain?.name || selectedChain.name || "Unknown"}
+          </p>
         </div>
 
         {/* Balance Card */}
         <div className="relative overflow-hidden rounded-lg backdrop-blur-xl bg-white/5 p-6">
           <h2 className="text-sm text-blue-400 uppercase tracking-wider mb-2">
-            Balance
+            Balance on {selectedChain.name}
           </h2>
           <p className="text-3xl font-bold text-white">
-            {balance?.data
-              ? `${(BigInt(balance.data.value) / BigInt(1e18)).toString()} ${
-                  balance.data.symbol
-                }`
-              : "Loading..."}
+            {formattedBalance} {balance.data?.symbol}
           </p>
         </div>
 
@@ -256,4 +317,17 @@ export default function Home() {
       </div>
     </div>
   );
+}
+
+export function useNetwork() {
+  const publicClient = usePublicClient();
+  const { chain: accountChain } = useAccount();
+
+  return {
+    chain: {
+      id: publicClient?.chain?.id,
+      name: publicClient?.chain?.name,
+      ...accountChain,
+    },
+  };
 }
