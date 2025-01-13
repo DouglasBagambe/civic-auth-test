@@ -7,6 +7,7 @@ import {
   useBalance,
   useSignMessage,
   useSendTransaction,
+  useDisconnect,
 } from "wagmi";
 import { userHasWallet } from "@civic/auth-web3";
 import { parseEther } from "viem";
@@ -15,6 +16,7 @@ export default function Home() {
   const userContext = useUser();
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   const { data: signMessageData, signMessage } = useSignMessage();
   const { sendTransaction } = useSendTransaction();
   const [messageToSign, setMessageToSign] = useState("Sign this message");
@@ -31,6 +33,14 @@ export default function Home() {
     connect({
       connector: connectors[0],
     });
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnect();
+    } catch (error) {
+      console.error("Error disconnecting wallet:", error);
+    }
+  };
 
   const createWallet = async () => {
     if (userContext.user && !userHasWallet(userContext)) {
@@ -139,7 +149,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  {/* Connection Status */}
+                  {/* Connection Status and Buttons */}
                   {!isConnected ? (
                     <button
                       onClick={connectExistingWallet}
@@ -150,11 +160,19 @@ export default function Home() {
                   ) : (
                     <div className="space-y-6">
                       <div className="rounded-lg bg-green-500/10 p-6">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                          <span className="text-green-400">
-                            Wallet Connected
-                          </span>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                            <span className="text-green-400">
+                              Wallet Connected
+                            </span>
+                          </div>
+                          <button
+                            onClick={handleDisconnect}
+                            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition-colors duration-300"
+                          >
+                            Disconnect
+                          </button>
                         </div>
                       </div>
 
