@@ -1,14 +1,26 @@
 "use client";
-/** @jsxImportSource react */
 import React, { useState, useEffect } from "react";
 import { UserButton, useUser } from "@civic/auth-web3/react";
-import { useConnect, useAccount, useBalance } from "wagmi";
+import {
+  useConnect,
+  useAccount,
+  useBalance,
+  useSignMessage,
+  useSendTransaction,
+} from "wagmi";
 import { userHasWallet } from "@civic/auth-web3";
+import { parseEther } from "viem";
 
 export default function Home() {
   const userContext = useUser();
   const { connect, connectors } = useConnect();
   const { isConnected } = useAccount();
+  const { data: signMessageData, signMessage } = useSignMessage();
+  const { sendTransaction } = useSendTransaction();
+  const [messageToSign, setMessageToSign] = useState("Hello from Civic Auth!");
+  const [recipientAddress, setRecipientAddress] = useState("");
+  const [amount, setAmount] = useState("");
+
   const balance = useBalance({
     address: userHasWallet(userContext)
       ? (userContext.walletAddress as `0x${string}`)
@@ -27,23 +39,24 @@ export default function Home() {
         connectExistingWallet();
       } catch (error) {
         console.error("Wallet creation error:", error);
-
-        // Check if it's a Turnkey error
-        if (
-          error instanceof Error &&
-          error.toString().includes("TurnkeyRequestError")
-        ) {
-          // Could add a toast notification here
-          alert(
-            "Unable to create wallet. Please ensure you have completed authentication with Civic."
-          );
-        } else {
-          alert(
-            "An unexpected error occurred while creating your wallet. Please try again."
-          );
-        }
+        alert(
+          "Unable to create wallet. Please ensure you have completed authentication."
+        );
       }
     }
+  };
+
+  const handleSignMessage = () => {
+    signMessage({ message: messageToSign });
+  };
+
+  const handleSendTransaction = () => {
+    if (!recipientAddress || !amount) return;
+
+    sendTransaction({
+      to: recipientAddress as `0x${string}`,
+      value: parseEther(amount),
+    });
   };
 
   // Interactive background effect
@@ -135,10 +148,71 @@ export default function Home() {
                       Connect Wallet
                     </button>
                   ) : (
-                    <div className="rounded-lg bg-green-500/10 p-6">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-green-400">Wallet Connected</span>
+                    <div className="space-y-6">
+                      <div className="rounded-lg bg-green-500/10 p-6">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                          <span className="text-green-400">
+                            Wallet Connected
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Message Signing Card */}
+                      <div className="rounded-lg backdrop-blur-xl bg-white/5 p-6 space-y-4">
+                        <h2 className="text-sm text-purple-400 uppercase tracking-wider">
+                          Sign Message
+                        </h2>
+                        <input
+                          type="text"
+                          value={messageToSign}
+                          onChange={(e) => setMessageToSign(e.target.value)}
+                          className="w-full p-3 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Enter message to sign"
+                        />
+                        <button
+                          onClick={handleSignMessage}
+                          className="w-full rounded-lg bg-purple-600 hover:bg-purple-500 px-6 py-3 text-white font-semibold transition-colors duration-300"
+                        >
+                          Sign Message
+                        </button>
+                        {signMessageData && (
+                          <div className="mt-4 p-4 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                            <h3 className="text-sm text-purple-400 mb-2">
+                              Signature
+                            </h3>
+                            <p className="font-mono text-sm text-white/80 break-all">
+                              {signMessageData}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Transaction Card */}
+                      <div className="rounded-lg backdrop-blur-xl bg-white/5 p-6 space-y-4">
+                        <h2 className="text-sm text-orange-400 uppercase tracking-wider">
+                          Send Transaction
+                        </h2>
+                        <input
+                          type="text"
+                          value={recipientAddress}
+                          onChange={(e) => setRecipientAddress(e.target.value)}
+                          className="w-full p-3 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="Recipient address (0x...)"
+                        />
+                        <input
+                          type="text"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          className="w-full p-3 rounded-lg bg-black/30 border border-white/10 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          placeholder="Amount in ETH"
+                        />
+                        <button
+                          onClick={handleSendTransaction}
+                          className="w-full rounded-lg bg-orange-600 hover:bg-orange-500 px-6 py-3 text-white font-semibold transition-colors duration-300"
+                        >
+                          Send Transaction
+                        </button>
                       </div>
                     </div>
                   )}
